@@ -1,0 +1,6 @@
+Implemenation of priority queue based on binary search tree for POSIX compliant platforms.
+
+TO:
+Build: make all
+Clean: make clean
+
