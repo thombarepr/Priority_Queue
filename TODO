@@ -1,0 +1,2 @@
+3/15:
+Implement pq_destroy function to delete entire priority queue and free all memories in nodes.
