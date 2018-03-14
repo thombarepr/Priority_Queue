@@ -1,4 +1,5 @@
 #include "stdio.h"
+#include "assert.h"
 #include "malloc.h"
 #include "pthread.h"
 typedef unsigned int uint32_t;
@@ -38,4 +39,4 @@ typedef enum
 #define PQ_HEADER	(uint16_t)(0x5A6B)
 void* pq_init(uint16_t high_water_mark, callback_t hcb, uint16_t low_water_mark, callback_t lcb);
 bool_t pq_add(void *p, void *data, uint16_t prio);
-bool_t pq_remove(void *p, void **data);
+void *pq_remove(void *p);

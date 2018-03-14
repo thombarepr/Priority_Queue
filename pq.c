@@ -48,16 +48,28 @@ void bst_add(node_t *root, node_t *node)
 	}
 }
 
-node_t *bst_remove(node_t *root)
+node_t *bst_remove(pq_t *pq)
 {
-	if (root)
+	node_t *node = pq->root;
+	node_t *tmp;
+
+	while (node)
 	{
-		node_t *node = bst_remove(node->right);
-		if (NULL == node)
-		{
-		}
+		tmp = node;
+		node = node->right;
 	}
-	return root;
+
+	if (tmp->parent)
+	{
+		tmp->parent->right = tmp->left;
+	}
+	else
+	{
+		pq->root = tmp->left;
+		if (pq->root)
+			pq->root->parent = NULL;
+	}
+	return tmp;
 }
 
 bool_t pq_add(void *p, void *data, uint16_t prio)
@@ -92,27 +104,31 @@ bool_t pq_add(void *p, void *data, uint16_t prio)
 	return ret;
 }
 
-bool_t pq_remove(void *p, void **data)
+void *pq_remove(void *p)
 {
 	pq_t *pq = (pq_t *)p;
-	bool_t ret = FALSE;
+	void *tmp;
 	
 	if ((NULL != pq) && (PQ_HEADER == pq->header))
 	{
 		pthread_mutex_lock(&pq->lock);
-		node_t *node = bst_remove(pq->root);
+		node_t *node = bst_remove(pq);
 		if (node)
 		{
-			if (NULL == node->parent)
-				pq->root = node->left;
-			*data = node->data;
+			tmp = node->data;
 			free(node);
 			node = NULL;
+		}
+		else
+		{
+			printf("Priority queue is empty.\n");
+			tmp = NULL;
 		}
 		pq->count--;	
 		pthread_mutex_unlock(&pq->lock);
 		if (pq->count < pq->low_water_mark && pq->lcb)
 			pq->lcb();	
 	}
-	return ret;
+	return tmp;
 }
+
