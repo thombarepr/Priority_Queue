@@ -23,11 +23,14 @@ typedef struct {
 	uint16_t count;
 	uint16_t high_water_mark;
 	uint16_t low_water_mark;
+	uint8_t high_water_mark_set;
+	uint8_t low_water_mark_set;
 	callback_t hcb;
 	callback_t lcb;
-	pthread_mutex_t lock;
 	node_t *root;	
 } pq_t;
+
+static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
 #define PQ_HEADER	(uint16_t)(0x5A6B)
 /****************************************************************************************/
@@ -49,7 +52,7 @@ void *pq_init(uint16_t high_water_mark, callback_t hcb, uint16_t low_water_mark,
 		pq->hcb = hcb;
 		pq->low_water_mark = low_water_mark;
 		pq->lcb = lcb;
-		if ((0 != pthread_mutex_init(&pq->lock, NULL)) || (high_water_mark < low_water_mark))
+		if (high_water_mark < low_water_mark)
 		{
 			free(pq);
 			pq = NULL;
@@ -123,9 +126,9 @@ pq_status_t pq_add(void *p, void *data, uint16_t prio)
 	pq_t *pq = (pq_t *)p;
 	pq_status_t ret = PQ_STATUS_INVALID;
 	
+	pthread_mutex_lock(&lock);
 	if ((NULL != pq) && (PQ_HEADER == pq->header))
 	{
-		pthread_mutex_lock(&pq->lock);
 		node_t *node = (node_t *)calloc(sizeof(node_t), 1);
 		if (NULL != node)
 		{
@@ -147,15 +150,23 @@ pq_status_t pq_add(void *p, void *data, uint16_t prio)
 		{
 			ret = PQ_STATUS_FAIL;
 		}
-		pthread_mutex_unlock(&pq->lock);
 
-		if (pq->count > pq->high_water_mark && pq->hcb)
-			pq->hcb();	
+		if (pq->count > pq->high_water_mark && pq->hcb && !pq->high_water_mark_set)
+		{
+			pq->hcb(1);	
+			pq->high_water_mark_set = 1; 
+		}
+		else if (pq->count >= pq->low_water_mark && pq->lcb && pq->low_water_mark_set)
+		{
+			pq->lcb(0);	
+			pq->low_water_mark_set = 0; 
+		}
 	}
 	else
 	{
 		PQ_DEBUG("Invalid priority queue !!!\n");
 	}
+	pthread_mutex_unlock(&lock);
 	return ret;
 }
 
@@ -172,9 +183,9 @@ pq_status_t pq_remove(void *p, void **data)
 	pq_t *pq = (pq_t *)p;
 	pq_status_t ret = PQ_STATUS_INVALID;
 	
+	pthread_mutex_lock(&lock);
 	if ((NULL != pq) && (PQ_HEADER == pq->header))
 	{
-		pthread_mutex_lock(&pq->lock);
 		node_t *node = bst_remove(pq);
 		if (NULL != node)
 		{
@@ -196,14 +207,22 @@ pq_status_t pq_remove(void *p, void **data)
 			PQ_DEBUG("Priority queue is empty.\n");
 			ret = PQ_STATUS_EMPTY;
 		}
-		pthread_mutex_unlock(&pq->lock);
-		if (pq->count < pq->low_water_mark && pq->lcb)
-			pq->lcb();	
+		if (pq->count <= pq->high_water_mark && pq->hcb && pq->high_water_mark_set)
+		{
+			pq->hcb(0);	
+			pq->high_water_mark_set = 0; 
+		}
+		else if (pq->count < pq->low_water_mark && pq->lcb && !pq->low_water_mark_set)
+		{
+			pq->lcb(1);	
+			pq->low_water_mark_set = 1; 
+		}
 	}
 	else
 	{
 		PQ_DEBUG("Invalid priority queue !!!\n");
 	}
+	pthread_mutex_unlock(&lock);
 	return ret;
 }
 
@@ -218,20 +237,23 @@ pq_status_t pq_delete(void *p)
 {
 	pq_t *pq = (pq_t *)p;
 	pq_status_t ret = PQ_STATUS_INVALID;
+	node_t *node = NULL;
 
+	pthread_mutex_lock(&lock);
 	if ((NULL != pq) && (PQ_HEADER == pq->header))
 	{
-		void *buf = NULL;
 		while (1)
 		{	
-			buf = NULL;
-			if (PQ_STATUS_EMPTY != pq_remove(pq, &buf))
+			node = bst_remove(pq);
+			if (NULL != node)
 			{
-				if (NULL != buf)
+				if (NULL != node->data)
 				{
-					free(buf);
-					buf = NULL;
+					free(node->data);
+					node->data = NULL;
 				}
+				free(node);
+				node = NULL;
 			}
 			else	
 			{
@@ -242,10 +264,12 @@ pq_status_t pq_delete(void *p)
 		free(pq);
 		pq = NULL;
 		ret = PQ_STATUS_PASS;
+		PQ_DEBUG("Priority queue deleted !!!\n");
 	}
 	else
 	{
 		PQ_DEBUG("Invalid priority queue !!!\n");
 	}
+	pthread_mutex_unlock(&lock);
 	return ret;
 }

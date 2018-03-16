@@ -9,7 +9,7 @@ typedef unsigned short uint16_t;
 typedef short int16_t;
 typedef unsigned char uint8_t;
 
-typedef void (*callback_t)(void);
+typedef void (*callback_t)(uint8_t);
 
 typedef enum
 {

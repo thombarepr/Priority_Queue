@@ -4,3 +4,11 @@ TO:
 Build: make all
 Clean: make clean
 
+Read pq.h for API's.
+
+Testapps:
+pq-test.c - Test basic priority queue operations
+thread.c  - Test multi threaded support of priority queue by spawning 2 threds which concuurently access same queue, performing random operations such as (ADD, REMOVE, DELETE_QUEUE). This test app demonstrate that highest priority data is removed from queue and data added by one thread can be returned to other thread also.
+
+To select test app change TEST_APP in Makefile and rebuild.
+
